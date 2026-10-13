@@ -1,0 +1,19 @@
+name: uptime
+# Monitor externo da Torque/Zeus, fora da VPS e fora do Mac. Falha do job = e-mail do GitHub para o dono.
+on:
+  schedule: [{ cron: "*/10 * * * *" }]
+  workflow_dispatch: {}
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: checar
+        run: |
+          set -u; falhas=0
+          chk(){ c=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 --retry 2 --retry-delay 5 "$2"); case " $3 " in *" $c "*) echo "ok   $1 $c";; *) echo "FALHA $1 $c (esperado $3)"; falhas=$((falhas+1));; esac; }
+          chk "torque-api auth"    https://torque-api.zeusagenciadigital.com/auth/v1/health   "200 401"
+          chk "torque-api storage" https://torque-api.zeusagenciadigital.com/storage/v1/status "200"
+          chk "torque front"       https://torque.zeusagenciadigital.com/                     "200"
+          chk "site zeus"          https://zeusagenciadigital.com/                            "200"
+          [ $falhas -eq 0 ] || { echo "::error::$falhas checagem(ns) falharam"; exit 1; }
